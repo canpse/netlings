@@ -3,6 +3,9 @@
 
     python3 nl.py lista   # casos e o que já passou
     python3 nl.py N       # abre o caso N (um shell no laboratório)
+    python3 nl.py         # lista e diz qual é o próximo
+
+Dentro do laboratório, `caso N` e `proximo` trocam de caso sem sair.
 
 Tudo roda em namespaces de rede sem sudo (unshare -rnm): nada encosta na
 sua rede de verdade, e ao sair do shell o laboratório some.
@@ -155,6 +158,10 @@ topologia() {{ {nl} _topologia; }}
 chamado() {{ {nl} _chamado {n}; }}
 dica() {{ {nl} _dica {n}; }}
 verificar() {{ {nl} _verificar {n}; }}
+lista() {{ {nl} lista; }}
+caso() {{ {nl} _existe "$1" && echo "$1" > "$NL_PROXIMO" && kill -HUP "$NL_FORA"; }}
+proximo() {{ caso "$({nl} _seguinte {n})"; }}
+[ -z "$NL_FORA" ] && export NL_FORA=$$
 PS1="\\[\\e[1;33m\\][caso {n} | ${{NL_NO:-fora}}]\\[\\e[0m\\] \\w \\$ "
 """)
     return rc
@@ -189,6 +196,7 @@ def dentro(n):
               "  chamado      relê a reclamação\n"
               "  dica         uma dica por vez (não dá a resposta)\n"
               "  verificar    testa se resolveu\n"
+              "  caso N       troca pro caso N (proximo: o seguinte; lista: todos)\n"
               "  exit         (aqui fora) fecha o laboratório; tudo some\n"
               f"anote o raciocínio em respostas/{mod.NOME[:2]}.md\n")
         subprocess.run(["bash", "--rcfile", str(rc)])
@@ -235,6 +243,35 @@ def lista():
         k = mod.NOME[:2]
         marca = f"\033[32m✓\033[0m {prog[k]}" if k in prog else " "
         print(f"  {k}  {mod.TITULO:<45} {marca}")
+    pendentes = [m.NOME[:2] for m in todos() if m.NOME[:2] not in prog]
+    if pendentes:
+        print(f"\npróximo: python3 nl.py {int(pendentes[0])}")
+
+
+def seguinte(n):
+    nomes = [m.NOME[:2] for m in todos()]
+    depois = [k for k in nomes if int(k) > int(n)]
+    return int(depois[0]) if depois else None
+
+
+def abrir(n):
+    """Abre o caso n; se lá dentro ele pedir outro (caso N / proximo), abre o outro."""
+    proximo = Path(tempfile.mkstemp(prefix="netlings-proximo-")[1])
+    try:
+        while n is not None:
+            mod = carregar(n)
+            RESPOSTAS.mkdir(exist_ok=True)
+            resp = RESPOSTAS / f"{mod.NOME[:2]}.md"
+            if not resp.exists():
+                resp.write_text(MODELO_RESPOSTA.format(n=mod.NOME[:2], titulo=mod.TITULO))
+            proximo.write_text("")
+            env = dict(os.environ, NL_PROXIMO=str(proximo))
+            env.pop("NL_FORA", None)
+            subprocess.run(["unshare", "-rnm", "--", sys.executable,
+                            str(AQUI / "nl.py"), "_dentro", str(n)], env=env)
+            n = proximo.read_text().strip() or None
+    finally:
+        proximo.unlink(missing_ok=True)
 
 
 def main():
@@ -251,14 +288,15 @@ def main():
         mostrar_chamado(carregar(a[1]))
     elif a[0] == "_topologia":
         print(TOPOLOGIA)
+    elif a[0] == "_existe":
+        ok = len(a) > 1 and a[1].isdigit() and any(CENARIOS.glob(f"{int(a[1]):02d}_*.py"))
+        if not ok:
+            print("caso não existe. lista mostra os que tem." if len(a) > 1 and a[1] else "acabaram os casos.")
+        sys.exit(0 if ok else 1)
+    elif a[0] == "_seguinte":
+        print(seguinte(a[1]) or "")
     elif a[0].isdigit():
-        mod = carregar(a[0])
-        RESPOSTAS.mkdir(exist_ok=True)
-        resp = RESPOSTAS / f"{mod.NOME[:2]}.md"
-        if not resp.exists():
-            resp.write_text(MODELO_RESPOSTA.format(n=mod.NOME[:2], titulo=mod.TITULO))
-        os.execvp("unshare", ["unshare", "-rnm", "--", sys.executable,
-                              str(AQUI / "nl.py"), "_dentro", a[0]])
+        abrir(a[0])
     else:
         print(__doc__)
 
