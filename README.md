@@ -7,6 +7,7 @@ verdade, conserta e roda `verificar`.
 
     python3 nl.py         # casos, o que já passou e qual é o próximo
     python3 nl.py 0       # comece pelo 00: a rede sã, pra conhecer o normal
+    python3 nl.py zerar   # apaga os ✓ (zerar N: só o caso N); respostas ficam
 
 Roda sem sudo, em namespaces de rede (`unshare -rnm`): não toca na sua rede
 real, e ao dar `exit` no shell de fora o laboratório some (pode quebrar à
@@ -21,6 +22,7 @@ Dentro do laboratório:
     verificar       # resolveu?
     caso N          # troca pro caso N (funciona até de dentro de um nó)
     proximo         # vai pro caso seguinte
+    reiniciar       # monta o caso de novo, quebrado como no começo
     lista           # todos os casos
     exit            # no shell de fora: fecha o laboratório
 

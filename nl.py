@@ -4,6 +4,7 @@
     python3 nl.py lista   # casos e o que já passou
     python3 nl.py N       # abre o caso N (um shell no laboratório)
     python3 nl.py         # lista e diz qual é o próximo
+    python3 nl.py zerar [N]   # apaga o ✓ do caso N, ou de todos (respostas ficam)
 
 Dentro do laboratório, `caso N` e `proximo` trocam de caso sem sair.
 
@@ -173,6 +174,7 @@ verificar() {{ {nl} _verificar {n}; }}
 lista() {{ {nl} lista; }}
 caso() {{ {nl} _existe "$1" && echo "$1" > "$NL_PROXIMO" && kill -HUP "$NL_FORA"; }}
 proximo() {{ caso "$({nl} _seguinte {n})"; }}
+reiniciar() {{ caso {n}; }}
 [ -z "$NL_FORA" ] && export NL_FORA=$$
 PS1="\\[\\e[1;33m\\][caso {n} | ${{NL_NO:-fora}}]\\[\\e[0m\\] \\w \\$ "
 """)
@@ -209,6 +211,7 @@ def dentro(n):
               "  dica         uma dica por vez (não dá a resposta)\n"
               "  verificar    testa se resolveu\n"
               "  caso N       troca pro caso N (proximo: o seguinte; lista: todos)\n"
+              "  reiniciar    monta este caso de novo, quebrado como no começo\n"
               "  exit         (aqui fora) fecha o laboratório; tudo some\n"
               f"anote o raciocínio em respostas/{mod.NOME[:2]}.md\n")
         subprocess.run(["bash", "--rcfile", str(rc)])
@@ -260,6 +263,17 @@ def lista():
         print(f"\npróximo: python3 nl.py {int(pendentes[0])}")
 
 
+def zerar(n=None):
+    prog = progresso()
+    if n is None:
+        prog = {}
+    else:
+        prog.pop(f"{int(n):02d}", None)
+    PROGRESSO.write_text(json.dumps(prog, indent=1))
+    print("progresso zerado" + (f" do caso {int(n):02d}" if n is not None else "") +
+          ". as respostas em respostas/ continuam lá.")
+
+
 def seguinte(n):
     nomes = [m.NOME[:2] for m in todos()]
     depois = [k for k in nomes if int(k) > int(n)]
@@ -290,6 +304,8 @@ def main():
     a = sys.argv[1:]
     if not a or a[0] == "lista":
         lista()
+    elif a[0] == "zerar":
+        zerar(a[1] if len(a) > 1 else None)
     elif a[0] == "_dentro":
         dentro(a[1])
     elif a[0] == "_verificar":
