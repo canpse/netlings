@@ -17,6 +17,7 @@ Dentro do laboratório:
 
     em cliente      # shell dentro do nó (cliente, roteador, servidor, dns); exit volta
     topologia       # como a rede DEVERIA ser
+    cola            # comandos por degrau (cola erros · cola tcpdump · cola consertar)
     chamado         # a reclamação de novo
     dica            # uma por vez, empurra sem entregar
     verificar       # resolveu?

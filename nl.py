@@ -175,6 +175,7 @@ lista() {{ {nl} lista; }}
 caso() {{ {nl} _existe "$1" && echo "$1" > "$NL_PROXIMO" && kill -HUP "$NL_FORA"; }}
 proximo() {{ caso "$({nl} _seguinte {n})"; }}
 reiniciar() {{ caso {n}; }}
+cola() {{ {nl} _cola "$@"; }}
 [ -z "$NL_FORA" ] && export NL_FORA=$$
 PS1="\\[\\e[1;33m\\][caso {n} | ${{NL_NO:-fora}}]\\[\\e[0m\\] \\w \\$ "
 """)
@@ -207,6 +208,7 @@ def dentro(n):
         print("comandos do laboratório:\n"
               "  em <nó>      abre um shell no nó (cliente, roteador, servidor, dns); exit volta\n"
               "  topologia    o desenho da rede como ela DEVERIA ser\n"
+              "  cola         os comandos por degrau (cola erros · cola tcpdump · cola consertar)\n"
               "  chamado      relê a reclamação\n"
               "  dica         uma dica por vez (não dá a resposta)\n"
               "  verificar    testa se resolveu\n"
@@ -263,6 +265,14 @@ def lista():
         print(f"\npróximo: python3 nl.py {int(pendentes[0])}")
 
 
+def cola(tema="escada"):
+    secoes = {}
+    for bloco in (AQUI / "cola.txt").read_text().split("## ")[1:]:
+        nome, _, corpo = bloco.partition("\n")
+        secoes[nome.strip()] = corpo.rstrip()
+    print(secoes.get(tema) or f"temas: {', '.join(secoes)}")
+
+
 def zerar(n=None):
     prog = progresso()
     if n is None:
@@ -306,6 +316,8 @@ def main():
         lista()
     elif a[0] == "zerar":
         zerar(a[1] if len(a) > 1 else None)
+    elif a[0] == "_cola":
+        cola(*a[1:2])
     elif a[0] == "_dentro":
         dentro(a[1])
     elif a[0] == "_verificar":
