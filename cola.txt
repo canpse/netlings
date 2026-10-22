@@ -20,6 +20,11 @@ Num roteador: sysctl net.ipv4.ip_forward (1 = repassa pacotes)
 Temas: cola erros · cola tcpdump · cola consertar
 
 ## erros
+nomes (ping, curl, qualquer programa)
+  Falha temporária na resolução de nome   o DNS NÃO RESPONDEU (fora do ar, inalcançável, rede caída)
+    (Temporary failure in name resolution)
+  Nome ou serviço desconhecido            o DNS RESPONDEU: esse nome não existe (NXDOMAIN)
+    (Name or service not known)
 ping
   Network is unreachable          o PRÓPRIO host não tem rota. nem saiu pacote
   Destination Host Unreachable    (vindo do seu IP) ARP do próximo salto falhou
