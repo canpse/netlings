@@ -26,18 +26,30 @@ PROGRESSO = AQUI / "progresso.json"
 RESPOSTAS = AQUI / "respostas"
 
 TOPOLOGIA = """
-  [cliente] eth0 192.168.1.10/24
-      |
-      | lan0 192.168.1.1/24
-  [roteador]
-      | br0 10.0.0.1/24 (switch com duas portas: p-srv e p-dns)
-      +--------------------------+
-      |                          |
-  [servidor] eth0 10.0.0.10/24   [dns] eth0 10.0.0.53/24
-   site em http://site.lab/       dnsmasq: site.lab -> 10.0.0.10
+  ┌─────────────────────────────┐
+  │ cliente                     │
+  │   eth0  192.168.1.10/24     │
+  └──────────────┬──────────────┘
+                 │ cabo (rede 192.168.1.0/24)
+  ┌──────────────┴──────────────┐
+  │ roteador                    │
+  │   lan0  192.168.1.1/24      │  ← o gateway do cliente
+  │   br0   10.0.0.1/24         │  ← o gateway do servidor e do dns
+  │         (br0 é um switch    │
+  │          com as portas      │
+  │          p-srv e p-dns)     │
+  └──────┬───────────────┬──────┘
+         │ p-srv         │ p-dns   (rede 10.0.0.0/24)
+  ┌──────┴────────┐ ┌────┴──────────┐
+  │ servidor      │ │ dns           │
+  │ eth0          │ │ eth0          │
+  │ 10.0.0.10/24  │ │ 10.0.0.53/24  │
+  │ site.lab      │ │ dnsmasq       │
+  └───────────────┘ └───────────────┘
 
   rota padrão: cliente via 192.168.1.1 · servidor e dns via 10.0.0.1
-  DNS do cliente: /etc/resolv.conf -> 10.0.0.53
+  DNS do cliente: /etc/resolv.conf → nameserver 10.0.0.53
+  site.lab → 10.0.0.10
 """
 
 MODELO_RESPOSTA = """# Caso {n}: {titulo}
