@@ -114,14 +114,7 @@ class Lab:
 
 def montar(lab):
     p = lab.pasta
-    # o /run de fora some; a pasta do usuário volta por baixo (socket do fa e afins)
-    runuser = os.environ.get("XDG_RUNTIME_DIR", "")
-    if runuser and os.path.isdir(runuser):
-        (p / "runuser").mkdir()
-        lab.sh(f"mount --rbind {runuser} {p}/runuser")
     lab.sh("mount -t tmpfs none /run && mkdir -p /run/netns /run/systemd/resolve")
-    if runuser and os.path.isdir(p / "runuser"):
-        lab.sh(f"mkdir -p {runuser} && mount --rbind {p}/runuser {runuser}")
     for no in ("cliente", "roteador", "servidor", "dns"):
         lab.sh(f"ip netns add {no} && ip -n {no} link set lo up")
     lab.sh("ip link add eth0 netns cliente type veth peer name lan0 netns roteador")
