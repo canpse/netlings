@@ -144,7 +144,7 @@ def montar(lab):
     with open(www / "grande.bin", "wb") as f:
         f.write(os.urandom(2 * 1024 * 1024))
     lab.servico("servidor", f"exec python3 -m http.server 80 --bind 0.0.0.0 -d {www}")
-    lab.servico("dns", "exec dnsmasq -d --no-resolv --no-hosts --address=/site.lab/10.0.0.10 "
+    lab.servico("dns", "exec dnsmasq -d --no-resolv --no-hosts --address=/site.lab/10.0.0.10 --local=/lab/ "
                        "--listen-address=10.0.0.53 --bind-interfaces -u root -g root --pid-file=")
     for _ in range(40):
         ok_web = lab.em("servidor", "ss -tln | grep -q ':80 '").returncode == 0
@@ -237,8 +237,11 @@ def verificar(n):
         prog[mod.NOME[:2]] = time.strftime("%Y-%m-%d %H:%M")
         PROGRESSO.write_text(json.dumps(prog, indent=1))
         resp = RESPOSTAS / f"{mod.NOME[:2]}.md"
-        print("\nresolvido. " + (f"agora escreve a causa e o caminho em {resp}"
-                                if resp.read_text().count("\n") < 20 else "resposta anotada, boa."))
+        if getattr(mod, "CHECKPOINT", False):
+            print(f"\ncheckpoint feito. o que estranhou fica em {resp}; proximo abre o primeiro caso.")
+        else:
+            print("\nresolvido. " + (f"agora escreve a causa e o caminho em {resp}"
+                                    if resp.read_text().count("\n") < 20 else "resposta anotada, boa."))
     else:
         print("\nainda não.")
 
@@ -259,7 +262,10 @@ def lista():
     for mod in todos():
         k = mod.NOME[:2]
         marca = f"\033[32m✓\033[0m {prog[k]}" if k in prog else " "
-        print(f"  {k}  {mod.TITULO:<45} {marca}")
+        if getattr(mod, "CHECKPOINT", False):
+            print(("\n" if k != "00" else "") + f"  {k}  \033[1m{mod.TITULO}\033[0m  {marca}")
+        else:
+            print(f"  {k}    {mod.TITULO:<45} {marca}")
     pendentes = [m.NOME[:2] for m in todos() if m.NOME[:2] not in prog]
     if pendentes:
         print(f"\npróximo: python3 nl.py {int(pendentes[0])}")
@@ -299,7 +305,8 @@ def abrir(n):
             RESPOSTAS.mkdir(exist_ok=True)
             resp = RESPOSTAS / f"{mod.NOME[:2]}.md"
             if not resp.exists():
-                resp.write_text(MODELO_RESPOSTA.format(n=mod.NOME[:2], titulo=mod.TITULO))
+                resp.write_text(getattr(mod, "RESPOSTA", None) or
+                                MODELO_RESPOSTA.format(n=mod.NOME[:2], titulo=mod.TITULO))
             proximo.write_text("")
             env = dict(os.environ, NL_PROXIMO=str(proximo))
             env.pop("NL_FORA", None)
