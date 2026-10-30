@@ -178,7 +178,7 @@ def rcfile(pasta, n):
 [ -f ~/.bashrc ] && . ~/.bashrc
 export NL_PASTA={pasta}
 alias tcpdump='tcpdump -Z root'
-em() {{ ip netns exec "$1" env NL_NO="$1" bash --rcfile {rc}; }}
+em() {{ ip netns exec "$1" env NL_NO="$1" NL_CAMINHO="${{NL_CAMINHO:+$NL_CAMINHO › }}$1" bash --rcfile {rc}; }}
 topologia() {{ {nl} _topologia; }}
 chamado() {{ {nl} _chamado {n}; }}
 dica() {{ {nl} _dica {n}; }}
@@ -187,17 +187,46 @@ lista() {{ {nl} lista; }}
 caso() {{ {nl} _existe "$1" && echo "$1" > "$NL_PROXIMO" && kill -HUP "$NL_FORA"; }}
 proximo() {{ caso "$({nl} _seguinte {n})"; }}
 reiniciar() {{ caso {n}; }}
-sair() {{ exit; }}
+sair() {{ : > "$NL_PROXIMO"; kill -HUP "$NL_FORA"; }}
 alias quit=sair
 cola() {{ {nl} _cola "$@"; }}
 [ -z "$NL_FORA" ] && export NL_FORA=$$
-PS1="\\[\\e[1;33m\\][caso {n} | ${{NL_NO:-fora}}]\\[\\e[0m\\] \\w \\$ "
+PS1="\\[\\e[1;33m\\][caso {n} | ${{NL_CAMINHO:-fora}}]\\[\\e[0m\\] \\w \\$ "
 """)
     return rc
 
 
+def descendentes(raiz):
+    filhos = {}
+    for d in Path("/proc").iterdir():
+        if d.name.isdigit():
+            try:
+                ppid = int((d / "stat").read_text().rsplit(")", 1)[1].split()[1])
+            except (OSError, IndexError, ValueError):
+                continue
+            filhos.setdefault(ppid, []).append(int(d.name))
+    pilha, todos = [raiz], []
+    while pilha:
+        for f in filhos.get(pilha.pop(), []):
+            todos.append(f)
+            pilha.append(f)
+    return todos
+
+
 def matar_o_resto():
-    """Mata tudo que ficou vivo dentro deste user namespace (serviços, coisas que ele subiu)."""
+    """Mata tudo que ficou vivo dentro deste user namespace (serviços, coisas que ele subiu).
+    Programas com capabilities de arquivo (ping) escondem o /proc/PID/ns; esses saem pela
+    árvore de processos: o dentro() é subreaper, então órfãos do laboratório viram filhos dele."""
+    for _ in range(20):  # matar um pai reparenta os filhos pra mim: varrer de novo
+        restam = descendentes(os.getpid())
+        if not restam:
+            break
+        for pid in restam:
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                pass
+        time.sleep(0.05)
     eu = os.readlink("/proc/self/ns/user")
     for d in Path("/proc").iterdir():
         if d.name.isdigit() and int(d.name) != os.getpid():
@@ -209,6 +238,8 @@ def matar_o_resto():
 
 
 def dentro(n):
+    import ctypes
+    ctypes.CDLL(None).prctl(36, 1)  # PR_SET_CHILD_SUBREAPER: órfãos do laboratório ficam comigo
     for sinal in (signal.SIGHUP, signal.SIGTERM):
         signal.signal(sinal, sair_com_limpeza)
     mod = carregar(n)
@@ -230,7 +261,8 @@ def dentro(n):
               "  verificar    testa se resolveu\n"
               "  caso N       troca pro caso N (proximo: o seguinte; lista: todos)\n"
               "  reiniciar    monta este caso de novo, quebrado como no começo\n"
-              "  exit / sair  (aqui fora) fecha o laboratório; tudo some\n"
+              "  exit         volta pro nó de antes (cada em abre um shell dentro do outro)\n"
+              "  sair / quit  fecha o laboratório inteiro, de qualquer nó; tudo some\n"
               f"anote o raciocínio em respostas/{mod.NOME[:2]}.md\n")
         subprocess.run(["bash", "--rcfile", str(rc)])
     finally:
@@ -327,8 +359,17 @@ def varrer_sobras():
 def abrir(n):
     """Abre o caso n; se lá dentro ele pedir outro (caso N / proximo), abre o outro."""
     varrer_sobras()
+    lab = None
+    encerrar = False
+
+    def repassar(sinal, _quadro):
+        # terminal fechou (ou kill): o laboratório limpa sozinho; aqui só repasso e espero
+        nonlocal encerrar
+        encerrar = True
+        if lab and lab.poll() is None:
+            lab.send_signal(sinal)
     for sinal in (signal.SIGHUP, signal.SIGTERM):
-        signal.signal(sinal, sair_com_limpeza)
+        signal.signal(sinal, repassar)
     proximo = Path(tempfile.mkstemp(prefix="netlings-proximo-")[1])
     try:
         while n is not None:
@@ -341,9 +382,14 @@ def abrir(n):
             proximo.write_text("")
             env = dict(os.environ, NL_PROXIMO=str(proximo))
             env.pop("NL_FORA", None)
-            subprocess.run(["unshare", "-rnm", "--", sys.executable,
-                            str(AQUI / "nl.py"), "_dentro", str(n)], env=env)
-            n = proximo.read_text().strip() or None
+            lab = subprocess.Popen(["unshare", "-rnm", "--", sys.executable,
+                                    str(AQUI / "nl.py"), "_dentro", str(n)], env=env)
+            while lab.poll() is None:
+                try:
+                    lab.wait()
+                except KeyboardInterrupt:
+                    pass  # Ctrl+C é do shell lá dentro, não meu
+            n = None if encerrar else (proximo.read_text().strip() or None)
     finally:
         proximo.unlink(missing_ok=True)
 
