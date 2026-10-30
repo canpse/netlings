@@ -15,6 +15,7 @@ import importlib.util
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -94,6 +95,16 @@ def progresso():
         return {}
 
 
+def morrer_com_o_pai():
+    """Serviço do laboratório recebe SIGKILL se o nl.py morrer (terminal fechado, kill)."""
+    import ctypes
+    ctypes.CDLL(None).prctl(1, signal.SIGKILL)  # PR_SET_PDEATHSIG
+
+
+def sair_com_limpeza(sinal, _quadro):
+    raise SystemExit(128 + sinal)
+
+
 class Lab:
     def __init__(self, pasta):
         self.pasta = Path(pasta)
@@ -109,7 +120,8 @@ class Lab:
     def servico(self, no, cmd):
         log = open(self.pasta / f"{no}.log", "a")
         self.servicos[no] = subprocess.Popen(["ip", "netns", "exec", no, "sh", "-c", cmd],
-                                             stdout=log, stderr=log, start_new_session=True)
+                                             stdout=log, stderr=log, start_new_session=True,
+                                             preexec_fn=morrer_com_o_pai)
 
 
 def montar(lab):
@@ -195,6 +207,8 @@ def matar_o_resto():
 
 
 def dentro(n):
+    for sinal in (signal.SIGHUP, signal.SIGTERM):
+        signal.signal(sinal, sair_com_limpeza)
     mod = carregar(n)
     pasta = Path(tempfile.mkdtemp(prefix="netlings-"))
     os.environ["NL_PASTA"] = str(pasta)
@@ -296,8 +310,21 @@ def seguinte(n):
     return int(depois[0]) if depois else None
 
 
+def varrer_sobras():
+    """Apaga pastas de laboratórios que morreram sem limpar (ex.: kill -9)."""
+    em_uso = subprocess.run(["ps", "-eo", "cmd"], capture_output=True, text=True).stdout
+    tmp = Path(tempfile.gettempdir())
+    for d in tmp.glob("netlings-*"):
+        if d.name.startswith("netlings-proximo-"):
+            if time.time() - d.stat().st_mtime > 86400:
+                d.unlink(missing_ok=True)
+        elif d.is_dir() and str(d) not in em_uso:
+            shutil.rmtree(d, ignore_errors=True)
+
+
 def abrir(n):
     """Abre o caso n; se lá dentro ele pedir outro (caso N / proximo), abre o outro."""
+    varrer_sobras()
     proximo = Path(tempfile.mkstemp(prefix="netlings-proximo-")[1])
     try:
         while n is not None:

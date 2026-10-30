@@ -25,12 +25,17 @@ nomes (ping, curl, qualquer programa)
     (Temporary failure in name resolution)
   Nome ou serviço desconhecido            o DNS RESPONDEU: esse nome não existe (NXDOMAIN)
     (Name or service not known)
-ping
-  Network is unreachable          o PRÓPRIO host não tem rota. nem saiu pacote
-  Destination Host Unreachable    (vindo do seu IP) ARP do próximo salto falhou
-    (vindo de um roteador)        aquele roteador não sabe seguir
+ping (aqui ele fala português; entre parênteses, o original)
+  A rede está fora de alcance     o PRÓPRIO host não tem rota. nem saiu pacote
+    (Network is unreachable)
+  Host de destino inalcançável    (De <seu IP>) ARP do próximo salto falhou
+    (Destination Host Unreachable)  (De <um roteador>) aquele roteador não sabe seguir
   100% loss, sem mensagem         morreu calado: firewall drop, rota de VOLTA, host fora
-  Frag needed / message too long  pacote maior que a MTU do caminho
+  Mensagem muito longa            pacote maior que a MTU da SUA placa (ou de um salto
+    (Message too long / Frag needed)  que avisou com ICMP)
+  Não há espaço de buffer disponível  no laboratório: o pacote é maior que a MTU da
+    (No buffer space available)       placa do OUTRO lado do cabo. num cabo de verdade
+                                      ele só some, sem mensagem
 curl / nc
   Could not resolve host          DNS ou /etc/hosts. a rede pode estar perfeita
   Connection refused (na hora)    chegou! ninguém escuta ali, ou firewall com reject
