@@ -187,6 +187,8 @@ lista() {{ {nl} lista; }}
 caso() {{ {nl} _existe "$1" && echo "$1" > "$NL_PROXIMO" && kill -HUP "$NL_FORA"; }}
 proximo() {{ caso "$({nl} _seguinte {n})"; }}
 reiniciar() {{ caso {n}; }}
+sair() {{ exit; }}
+alias quit=sair
 cola() {{ {nl} _cola "$@"; }}
 [ -z "$NL_FORA" ] && export NL_FORA=$$
 PS1="\\[\\e[1;33m\\][caso {n} | ${{NL_NO:-fora}}]\\[\\e[0m\\] \\w \\$ "
@@ -228,7 +230,7 @@ def dentro(n):
               "  verificar    testa se resolveu\n"
               "  caso N       troca pro caso N (proximo: o seguinte; lista: todos)\n"
               "  reiniciar    monta este caso de novo, quebrado como no começo\n"
-              "  exit         (aqui fora) fecha o laboratório; tudo some\n"
+              "  exit / sair  (aqui fora) fecha o laboratório; tudo some\n"
               f"anote o raciocínio em respostas/{mod.NOME[:2]}.md\n")
         subprocess.run(["bash", "--rcfile", str(rc)])
     finally:
@@ -325,6 +327,8 @@ def varrer_sobras():
 def abrir(n):
     """Abre o caso n; se lá dentro ele pedir outro (caso N / proximo), abre o outro."""
     varrer_sobras()
+    for sinal in (signal.SIGHUP, signal.SIGTERM):
+        signal.signal(sinal, sair_com_limpeza)
     proximo = Path(tempfile.mkstemp(prefix="netlings-proximo-")[1])
     try:
         while n is not None:
@@ -369,6 +373,13 @@ def main():
         sys.exit(0 if ok else 1)
     elif a[0] == "_seguinte":
         print(seguinte(a[1]) or "")
+    elif a[0].isdigit() and os.environ.get("NL_PROXIMO"):
+        # já dentro de um laboratório: troca de caso em vez de abrir outro dentro deste
+        if not any(CENARIOS.glob(f"{int(a[0]):02d}_*.py")):
+            sys.exit("caso não existe. lista mostra os que tem.")
+        print(f"você já está no laboratório: trocando pro caso {int(a[0])} (aqui dentro, o atalho é: caso {int(a[0])})")
+        Path(os.environ["NL_PROXIMO"]).write_text(a[0])
+        os.kill(int(os.environ["NL_FORA"]), signal.SIGHUP)
     elif a[0].isdigit():
         abrir(a[0])
     else:
