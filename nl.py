@@ -5,6 +5,7 @@
     python3 nl.py N       # abre o caso N (um shell no laboratório)
     python3 nl.py         # lista e diz qual é o próximo
     python3 nl.py zerar [N]   # apaga o ✓ do caso N, ou de todos (respostas ficam)
+    python3 nl.py conferir    # a máquina tem tudo? (programas e namespaces sem sudo)
 
 Dentro do laboratório, `caso N` e `proximo` trocam de caso sem sair.
 
@@ -394,10 +395,54 @@ def abrir(n):
         proximo.unlink(missing_ok=True)
 
 
+# programa -> (pacote no Fedora, no Debian/Ubuntu, no Arch)
+PROGRAMAS = {
+    "ip": ("iproute", "iproute2", "iproute2"), "tc": ("iproute-tc", "iproute2", "iproute2"),
+    "ss": ("iproute", "iproute2", "iproute2"), "nft": ("nftables", "nftables", "nftables"),
+    "dnsmasq": ("dnsmasq", "dnsmasq-base", "dnsmasq"), "dig": ("bind-utils", "dnsutils", "bind"),
+    "tcpdump": ("tcpdump", "tcpdump", "tcpdump"), "traceroute": ("traceroute", "traceroute", "traceroute"),
+    "mtr": ("mtr", "mtr-tiny", "mtr"), "curl": ("curl", "curl", "curl"),
+    "nc": ("nmap-ncat", "netcat-openbsd", "openbsd-netcat"), "unshare": ("util-linux", "util-linux", "util-linux"),
+}
+
+
+def conferir():
+    """Confere programas e namespaces sem sudo. Sai com 0 se está tudo pronto."""
+    falta = [p for p in PROGRAMAS if not shutil.which(p)]
+    ok = True
+    if sys.version_info < (3, 8):
+        print("falta: Python 3.8 ou mais novo"); ok = False
+    if falta:
+        ok = False
+        print("faltam programas: " + " ".join(falta))
+        for i, (nome, cmd) in enumerate([("Fedora", "sudo dnf install"), ("Debian/Ubuntu", "sudo apt install"),
+                                         ("Arch", "sudo pacman -S")]):
+            pacotes = sorted({PROGRAMAS[p][i] for p in falta})
+            print(f"  {nome}: {cmd} {' '.join(pacotes)}")
+    if shutil.which("unshare") and shutil.which("ip"):
+        r = subprocess.run(["unshare", "-rnm", "--", "ip", "link", "set", "lo", "up"],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            ok = False
+            print("namespaces sem sudo bloqueados: " + (r.stderr.strip() or f"código {r.returncode}"))
+            ap = Path("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
+            if ap.exists() and ap.read_text().strip() == "1":
+                print("  é o AppArmor (Ubuntu 24.04+). Liberar até reiniciar:\n"
+                      "  sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0")
+            mx = Path("/proc/sys/user/max_user_namespaces")
+            if mx.exists() and mx.read_text().strip() == "0":
+                print("  user.max_user_namespaces está em 0: sudo sysctl user.max_user_namespaces=15000")
+    if ok:
+        print(f"ok: tudo pronto, {len(todos())} casos. comece com: python3 nl.py 0")
+    sys.exit(0 if ok else 1)
+
+
 def main():
     a = sys.argv[1:]
     if not a or a[0] == "lista":
         lista()
+    elif a[0] == "conferir":
+        conferir()
     elif a[0] == "zerar":
         zerar(a[1] if len(a) > 1 else None)
     elif a[0] == "_cola":

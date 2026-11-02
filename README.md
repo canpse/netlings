@@ -12,29 +12,41 @@ Fiz isso porque eu sabia a teoria de redes, mas travava na hora de
 diagnosticar. Faltava prática com as ferramentas, ler a saída delas e ter
 intuição de por onde começar.
 
-## Rodar
+## Instalar: peça ao seu agente
+
+Mande isto pro Claude Code, pro Codex ou pro agente que você usa:
+
+    Instala isso pra mim: https://github.com/canpse/netlings
+
+O `AGENTS.md` explica pra ele como instalar, conferir a máquina e, depois,
+como te ajudar sem entregar a resposta: uma dica por vez e comentário sobre o
+raciocínio que você anotou.
+
+À mão:
 
     git clone https://github.com/canpse/netlings && cd netlings
-    python3 nl.py         # lista os casos, o que já passou e qual é o próximo
-    python3 nl.py 0       # comece pelo 00: a rede sã, pra conhecer o normal
+    python3 nl.py conferir   # a máquina tem tudo? se não, diz o que instalar
+    python3 nl.py 0          # comece pelo 00: a rede sã, pra conhecer o normal
+    python3 nl.py            # lista os casos, o que já passou e qual é o próximo
 
 **Não precisa de sudo.** Tudo roda em namespaces de rede (`unshare -rnm`),
 então não toca na sua rede real. Ao dar `exit` no shell de fora, o
 laboratório some. Pode quebrar à vontade: abrir de novo zera tudo.
 
 Precisa de Linux com user namespaces liberados (o padrão no Fedora, no Arch
-e no Ubuntu recente), Python 3 e destes programas:
+e no Ubuntu recente), Python 3 e destes programas (o `conferir` dá o comando
+de instalação certo pra sua distro):
 
 | Programa | Fedora | Debian/Ubuntu |
 |---|---|---|
-| ip, tc, ss | iproute | iproute2 |
+| ip, ss / tc | iproute / iproute-tc | iproute2 |
 | nft | nftables | nftables |
 | dnsmasq | dnsmasq | dnsmasq-base |
 | dig | bind-utils | dnsutils |
 | tcpdump, traceroute, mtr, curl, nc | mesmos nomes (nc = nmap-ncat) | mesmos nomes (nc = netcat-openbsd) |
 
 No Ubuntu 24.04 ou mais novo, o AppArmor pode bloquear `unshare` sem root. Se
-der `Operation not permitted`, veja `kernel.apparmor_restrict_unprivileged_userns`.
+der `Operation not permitted`, o `conferir` mostra como liberar.
 
 ## Dentro do laboratório
 
