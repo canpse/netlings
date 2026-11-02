@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
-CENARIOS = Path.home() / "Assistente/redes2/netlings/cenarios"
+CENARIOS = AQUI / "casos"
 PROGRESSO = AQUI / "progresso.json"
 RESPOSTAS = AQUI / "respostas"
 
